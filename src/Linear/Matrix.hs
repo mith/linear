@@ -19,7 +19,7 @@ module Linear.Matrix
   , column
   , adjoint
   , M22, M33, M44, M43, m33_to_m44, m43_to_m44
-  , det22, det33, inv22, inv33
+  , det22, det33, det44, inv22, inv33, inv44
   , eye2, eye3, eye4
   , Trace(..)
   , translation
@@ -251,6 +251,19 @@ det33 (V3 (V3 a b c)
           (V3 g h i)) = a * (e*i-f*h) - d * (b*i-c*h) + g * (b*f-c*e)
 {-# INLINE det33 #-}
 
+det44 :: Num a => M44 a -> a
+det44 (V4 (V4 a b c d)
+          (V4 e f g h)
+          (V4 i j k l)
+          (V4 m n o p)) =
+  a' - b' + c' - d'
+  where a' = a * cofactor (f, g, h, j, k, l, n, o, p)
+        b' = b * cofactor (e, g, h, i, k, l, m, o, p)
+        c' = c * cofactor (e, f, h, i, j, l, m, n, p)
+        d' = d * cofactor (e, f, g, i, j, k, m, n, o)
+        cofactor (q, r, s, t, u, v, w, x, y) = 
+          det33 (V3 (V3 q r s) (V3 t u v) (V3 w x y))
+
 -- |2x2 matrix inverse.
 --
 -- >>> inv22 $ V2 (V2 1 2) (V2 3 4)
@@ -287,3 +300,33 @@ inv33 m@(V3 (V3 a b c)
         det = det33 m
 {-# INLINE inv33 #-}
 
+-- |4x4 matrix inverse
+inv44 :: (Epsilon a, Floating a) => M44 a -> Maybe (M44 a)
+inv44 mt@(V4 (V4 a b c d)
+             (V4 e f g h)
+             (V4 i j k l)
+             (V4 m n o p))
+  | nearZero det = Nothing
+  | otherwise = Just $ V4 (V4 a' b' c' d')
+                          (V4 e' f' g' h')
+                          (V4 i' j' k' l')
+                          (V4 m' n' o' p')
+  where det = det44 mt
+        a' = cofactor (f, g, h, j, k, l, n, o, p)
+        b' = cofactor (e, g, h, i, k, l, m, o, p)
+        c' = cofactor (e, f, h, i, j, l, m, n, p)
+        d' = cofactor (e, f, g, i, j, k, m, n, o)
+        e' = cofactor (b, c, d, j, k, l, n, o, p)
+        f' = cofactor (a, c, d, i, k, l, m, o, p)
+        g' = cofactor (a, b, d, i, j, l, m, n, p)
+        h' = cofactor (a, b, c, i, j, k, m, n, o)
+        i' = cofactor (b, c, d, f, g, h, n, o, p)
+        j' = cofactor (a, c, d, e, g, h, m, o, p)
+        k' = cofactor (a, b, d, e, f, h, m, n, p)
+        l' = cofactor (a, b, c, e, f, g, m, n, o)
+        m' = cofactor (b, c, d, f, g, h, j, k, l)
+        n' = cofactor (a, c, d, e, g, h, i, k, l)
+        o' = cofactor (a, b, d, e, f, h, i, j, l)
+        p' = cofactor (a, b, c, e, f, g, i, j, k)
+        cofactor (q, r, s, t, u, v, w, x, y) = 
+          det33 (V3 (V3 q r s) (V3 t u v) (V3 w x y))
