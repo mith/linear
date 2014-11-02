@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 ---------------------------------------------------------------------------
 -- |
 -- Copyright   :  (C) 2014 Edward Kmett
@@ -9,11 +10,13 @@
 --
 -- Common perspective transformation matrices.
 ---------------------------------------------------------------------------
+
 module Linear.Perspective
   ( lookAt
   , perspective
   , infinitePerspective
   , ortho
+  , _Project
   ) where
 
 import Control.Lens hiding (index)
@@ -45,7 +48,7 @@ lookAt eye center up =
 -- | Build a matrix for a symmetric perspective-view frustum
 perspective
   :: Floating a
-  => a -- ^ FOV
+  => a -- ^ Vertical FOV in radians
   -> a -- ^ Aspect ratio
   -> a -- ^ Near plane
   -> a -- ^ Far plane
@@ -64,7 +67,7 @@ perspective fovy aspect near far =
 -- | Build a matrix for a symmetric perspective-view frustum with a far plane at infinite
 infinitePerspective
   :: Floating a
-  => a -- ^ FOV
+  => a -- ^ Vertical FOV an radians
   -> a -- ^ Aspect Ratio
   -> a -- ^ Near plane
   -> M44 a
@@ -100,3 +103,25 @@ ortho left right bottom top near far =
   where a = right - left
         b = top - bottom
         c = far - near
+            
+-- | Map the specified object coordinates into window coordinates
+_Project
+  :: (Epsilon a, Floating a)
+  => M44 a
+  -> M44 a
+  -> V4 a
+  -> Iso' (V3 a) (V3 a)
+_Project model proj vwp =
+  iso fromWindow toWindow
+  where fromWindow (V3 x y z) = let Just inv = inv44 (proj * model)
+                                    ndc = V3 ((x - vwp^._x) / vwp^._z) 
+                                             ((y - vwp^._y) / vwp^._w)
+                                             z
+                                    clip = point ndc * 2 - 1                 
+                                    obj = inv !* clip
+                                    in normalizePoint obj
+        toWindow obj = let clip = proj !*! model !* point obj
+                           ndc  = (normalizePoint clip) * 0.5 + 0.5
+                       in V3 (ndc^._x * vwp^._z + vwp^._x)
+                             (ndc^._y * vwp^._w + vwp^._y)
+                             (ndc^._z)
